@@ -66,20 +66,34 @@ npm run db:studio   # Prisma Studio — browse/edit the DB in a GUI
 ## Deploying
 
 Recommended: **Vercel** (for the Next.js app) + **Neon** or **Supabase** (for managed Postgres).
+The repo is already set up for this — `npm install` runs `prisma generate` automatically via a
+`postinstall` hook, so a fresh Vercel build works without extra config.
 
-1. Create a Postgres database on Neon/Supabase and copy its connection string.
-2. Push this repo to GitHub and import it into Vercel.
-3. In Vercel's project settings, set the environment variables:
-   - `DATABASE_URL` — your Neon/Supabase connection string
-   - `ANTHROPIC_API_KEY` — for AI feedback
-4. Vercel runs `next build`, which does not run migrations automatically — before or after the
-   first deploy, run against the production `DATABASE_URL`:
+1. **Create the database.** On [Neon](https://neon.tech) or [Supabase](https://supabase.com),
+   create a Postgres project and copy its connection string.
+   - **Neon specifically:** use the **pooled** connection string (the one with `-pooler` in the
+     hostname), not the direct one. Vercel functions are serverless — each invocation can open a
+     new DB connection, and the pooled endpoint (PgBouncer) is what keeps that from exhausting
+     Neon's connection limit. Supabase's default connection string is already pooled the same way.
+2. **Push this repo to GitHub** (already done — `claude/report-connection-61qnlj`) and import it
+   into Vercel as a new project. Vercel auto-detects Next.js; no build command changes needed.
+3. **Set environment variables** in Vercel's project settings (Settings → Environment Variables):
+   - `DATABASE_URL` — the pooled connection string from step 1
+   - `ANTHROPIC_API_KEY` — for AI feedback (from https://console.anthropic.com/)
+   - `ANTHROPIC_MODEL` — optional, defaults to `claude-opus-5`
+4. **Deploy.** Vercel builds and deploys automatically on push.
+5. **Apply the schema and seed data**, once, against the production database — run these from your
+   own machine with `DATABASE_URL` (and `DATA_FILE` pointing at your local spreadsheet) set to the
+   production values:
    ```bash
-   npx prisma migrate deploy
-   npm run db:seed
+   DATABASE_URL="<your-neon-or-supabase-url>" npm run db:migrate:deploy
+   DATABASE_URL="<your-neon-or-supabase-url>" npm run db:seed
    ```
-5. The app has no login by default — keep the deployment URL private, or ask for a password-gate
-   to be added if you plan to share the link.
+   Re-run `db:migrate:deploy` after any future schema change; `db:seed` is safe to re-run any time
+   you want to re-import from the spreadsheet.
+6. The app has no login by default — keep the deployment URL private (Vercel gives you an
+   unguessable `*.vercel.app` URL by default), or ask for a password-gate to be added if you plan
+   to share the link.
 
 ## Project structure
 
