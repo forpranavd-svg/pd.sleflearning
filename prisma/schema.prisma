@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// A single interview-prep question, imported from the study spreadsheet
+// plus fields the app itself manages (review status, practice history).
+model Question {
+  id       String @id @default(cuid())
+
+  // --- Imported from the spreadsheet ---
+  topic                 String
+  subTopic              String?
+  probabilityTier       String? // OProb, e.g. T1-VLikely-MK, T2-Likely, T4-Rare (see Legend sheet)
+  level                 String? // DLevel, e.g. Senior, Architect
+  infraVsDev            String? // Infra | Dev | Both
+  scope                 String? // Broad | Specific
+  reviewBeforeInterview Boolean @default(false) // "Review 1 day Before Interview" column
+  question              String  @db.Text
+  answer                String? @db.Text
+  sourceSheet           String // which spreadsheet tab this row came from
+
+  // --- App-managed state ---
+  noReviewNeeded   Boolean   @default(false) // user-set: exclude from practice rotation
+  timesPracticed   Int       @default(0)
+  lastPracticedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  attempts PracticeAttempt[]
+
+  @@index([topic])
+  @@index([subTopic])
+  @@index([probabilityTier])
+  @@index([noReviewNeeded])
+}
+
+// One recorded practice attempt: the user's typed answer plus AI feedback.
+model PracticeAttempt {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  userAnswer String  @db.Text
+  aiFeedback String? @db.Text
+
+  createdAt DateTime @default(now())
+
+  @@index([questionId])
+}
