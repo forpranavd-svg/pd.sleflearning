@@ -14,17 +14,36 @@ datasource db {
 // this table exists so #6's multi-user schema can be added additively without
 // a second migration later; no code creates User rows yet.
 model User {
-  id        String   @id @default(cuid())
-  email     String?  @unique
-  phone     String?  @unique
-  name      String?
-  role      String? // "Developer" | "CTO" | "Architect" | "Scrum Master" | "My Role" | "Data Engineer" | "AI Engineer" | custom
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  email          String?  @unique
+  phone          String?  @unique
+  name           String?
+  role           String? // "Developer" | "CTO" | "Architect" | "Scrum Master" | "My Role" | "Data Engineer" | "AI Engineer" | custom
+  passwordHash   String? // optional password fallback alongside passwordless login (#8)
+  sessionVersion Int      @default(0) // bumped on logout/password change to invalidate all existing session cookies
+  createdAt      DateTime @default(now())
 
   ownedQuestions   Question[]        @relation("QuestionOwner")
   listItems        UserQuestion[]
   practiceAttempts PracticeAttempt[]
   jobs             Job[]
+  loginTokens      LoginToken[]
+}
+
+// Single-use, expiring tokens for passwordless email login (#8). Only the
+// SHA-256 hash of the raw token is stored, so a DB read alone can't be used
+// to log in as someone else.
+model LoginToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // A single interview-prep question, imported from the study spreadsheet

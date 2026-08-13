@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
+import { redactPrivateAnswer } from "@/lib/questionFilters";
+import { getCurrentUser } from "@/lib/auth/session";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-opus-5";
 
@@ -24,10 +26,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const question = await prisma.question.findUnique({ where: { id: body.questionId } });
-  if (!question) {
+  const viewer = await getCurrentUser();
+  const rawQuestion = await prisma.question.findUnique({ where: { id: body.questionId } });
+  if (
+    !rawQuestion ||
+    (rawQuestion.questionVisibility === "Private" && rawQuestion.ownerId !== (viewer?.id ?? null))
+  ) {
     return NextResponse.json({ error: "Question not found" }, { status: 404 });
   }
+  const question = redactPrivateAnswer(rawQuestion, viewer?.id ?? null);
 
   const client = new Anthropic();
 
@@ -67,6 +74,7 @@ export async function POST(request: NextRequest) {
   const attempt = await prisma.practiceAttempt.create({
     data: {
       questionId: question.id,
+      userId: viewer?.id,
       userAnswer: body.userAnswer,
       aiFeedback: feedback,
     },

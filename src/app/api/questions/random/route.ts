@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { buildQuestionWhere } from "@/lib/questionFilters";
+import { buildQuestionWhere, redactPrivateAnswer } from "@/lib/questionFilters";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const where = buildQuestionWhere(searchParams);
+  const viewer = await getCurrentUser();
+  const where = buildQuestionWhere(searchParams, viewer?.id);
 
   // Practice mode excludes questions marked "no review needed" unless the
   // caller explicitly asked for a different reviewNeeded filter.
@@ -25,5 +27,5 @@ export async function GET(request: NextRequest) {
     take: 1,
   });
 
-  return NextResponse.json({ question });
+  return NextResponse.json({ question: question ? redactPrivateAnswer(question, viewer?.id ?? null) : null });
 }

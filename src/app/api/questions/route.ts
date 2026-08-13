@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { buildQuestionWhere } from "@/lib/questionFilters";
+import { buildQuestionWhere, redactPrivateAnswer } from "@/lib/questionFilters";
+import { getCurrentUser } from "@/lib/auth/session";
 
 const PAGE_SIZE = 50;
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const where = buildQuestionWhere(searchParams);
+  const viewer = await getCurrentUser();
+  const where = buildQuestionWhere(searchParams, viewer?.id);
 
   const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
 
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    questions,
+    questions: questions.map((q) => redactPrivateAnswer(q, viewer?.id ?? null)),
     total,
     page,
     pageSize: PAGE_SIZE,
