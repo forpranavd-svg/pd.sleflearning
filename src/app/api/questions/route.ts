@@ -22,8 +22,22 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
+  const listedIds = viewer
+    ? new Set(
+        (
+          await prisma.userQuestion.findMany({
+            where: { userId: viewer.id, questionId: { in: questions.map((q) => q.id) } },
+            select: { questionId: true },
+          })
+        ).map((row) => row.questionId)
+      )
+    : new Set<string>();
+
   return NextResponse.json({
-    questions: questions.map((q) => redactPrivateAnswer(q, viewer?.id ?? null)),
+    questions: questions.map((q) => ({
+      ...redactPrivateAnswer(q, viewer?.id ?? null),
+      inMyList: listedIds.has(q.id),
+    })),
     total,
     page,
     pageSize: PAGE_SIZE,

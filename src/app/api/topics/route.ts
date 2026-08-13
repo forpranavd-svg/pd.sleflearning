@@ -45,5 +45,8 @@ export async function GET() {
     levels: compact(levels.map((r) => r.level)),
     infraVsDevValues: compact(infraVsDevValues.map((r) => r.infraVsDev)),
     scopes: compact(scopes.map((r) => r.scope)),
+    // Fixed list (not derived from data) for the public-bank role filter (#15).
+    // "My Role" isn't included — it's an import-time default, not a browsable value.
+    roles: ["Developer", "CTO", "Architect", "Scrum Master", "Data Engineer", "AI Engineer"],
   });
 }

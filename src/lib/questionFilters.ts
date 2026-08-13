@@ -16,6 +16,8 @@ function multiValue(searchParams: URLSearchParams, key: string): string[] | unde
  *   topic, subTopic, probabilityTier, level, infraVsDev, scope  - comma-separated, OR'd within a field
  *   reviewNeeded=true|false                                     - filters on noReviewNeeded
  *   q                                                            - free-text search over question/answer
+ *   role                                                         - matches questions targeting that role,
+ *                                                                  OR questions with no role set (applies to everyone)
  *
  * `viewerId` scopes results to Public questions plus the viewer's own
  * Private ones — omit (or pass null) for an anonymous viewer, who only
@@ -49,6 +51,11 @@ export function buildQuestionWhere(
   const reviewNeeded = searchParams.get("reviewNeeded");
   if (reviewNeeded === "true") where.noReviewNeeded = false;
   if (reviewNeeded === "false") where.noReviewNeeded = true;
+
+  const role = searchParams.get("role")?.trim();
+  if (role) {
+    and.push({ OR: [{ targetRoles: { isEmpty: true } }, { targetRoles: { has: role } }] });
+  }
 
   const q = searchParams.get("q")?.trim();
   if (q) {
