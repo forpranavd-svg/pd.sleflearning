@@ -13,3 +13,14 @@ export function isValidPhone(value: string): boolean {
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
+
+/**
+ * Validates a post-login redirect target: must be a same-origin relative
+ * path (starts with a single "/", not "//" or "/\") — rejects anything that
+ * could be used as an open redirect to an external site.
+ */
+export function safeNextPath(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
+  return value;
+}

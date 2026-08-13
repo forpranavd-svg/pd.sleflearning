@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/auth/password";
-import { isValidEmail, isValidPhone, normalizeEmail } from "@/lib/auth/validation";
+import { isValidEmail, isValidPhone, normalizeEmail, safeNextPath } from "@/lib/auth/validation";
 import { checkRateLimit } from "@/lib/auth/rateLimit";
 import { createLoginToken } from "@/lib/auth/tokens";
 import { sendMagicLinkEmail } from "@/lib/auth/email";
@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
   const email = typeof body.email === "string" && body.email.trim() ? normalizeEmail(body.email) : null;
   const phone = typeof body.phone === "string" && body.phone.trim() ? body.phone.trim() : null;
   const password = typeof body.password === "string" && body.password ? body.password : null;
+  const next = safeNextPath(body.next);
 
   if (!email && !phone) {
     return NextResponse.json({ error: "Provide an email or phone number." }, { status: 400 });
@@ -65,8 +66,9 @@ export async function POST(request: NextRequest) {
   // flow: register -> check email/phone -> logged in.
   if (email) {
     const token = await createLoginToken(user.id);
-    const verifyUrl = new URL(`/api/auth/login/verify?token=${token}`, request.nextUrl.origin).toString();
-    await sendMagicLinkEmail(email, verifyUrl);
+    const verifyUrl = new URL(`/api/auth/login/verify?token=${token}`, request.nextUrl.origin);
+    if (next) verifyUrl.searchParams.set("next", next);
+    await sendMagicLinkEmail(email, verifyUrl.toString());
     return NextResponse.json({ channel: "email", contact: email });
   }
 

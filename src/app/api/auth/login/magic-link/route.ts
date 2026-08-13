@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isValidEmail, normalizeEmail } from "@/lib/auth/validation";
+import { isValidEmail, normalizeEmail, safeNextPath } from "@/lib/auth/validation";
 import { checkRateLimit } from "@/lib/auth/rateLimit";
 import { createLoginToken } from "@/lib/auth/tokens";
 import { sendMagicLinkEmail } from "@/lib/auth/email";
@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
   const email = normalizeEmail(body.email);
+  const next = safeNextPath(body.next);
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const [ipLimit, emailLimit] = await Promise.all([
@@ -28,8 +29,9 @@ export async function POST(request: NextRequest) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (user) {
     const token = await createLoginToken(user.id);
-    const verifyUrl = new URL(`/api/auth/login/verify?token=${token}`, request.nextUrl.origin).toString();
-    await sendMagicLinkEmail(email, verifyUrl);
+    const verifyUrl = new URL(`/api/auth/login/verify?token=${token}`, request.nextUrl.origin);
+    if (next) verifyUrl.searchParams.set("next", next);
+    await sendMagicLinkEmail(email, verifyUrl.toString());
   }
 
   return NextResponse.json(GENERIC_RESPONSE);

@@ -21,6 +21,7 @@ function LoginPageInner() {
 
   const initialChannel = searchParams.get("channel");
   const initialContact = searchParams.get("contact");
+  const next = searchParams.get("next");
 
   const [mode, setMode] = useState<Mode>(
     initialChannel === "email" && initialContact
@@ -48,7 +49,7 @@ function LoginPageInner() {
     const res = await fetch("/api/auth/login/magic-link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, next }),
     });
     const data = await res.json();
     setSubmitting(false);
@@ -92,7 +93,7 @@ function LoginPageInner() {
       setSubmitting(false);
       return;
     }
-    router.push("/");
+    router.push(next ?? "/");
     router.refresh();
   }
 
@@ -110,7 +111,7 @@ function LoginPageInner() {
       setSubmitting(false);
       return;
     }
-    router.push("/");
+    router.push(next ?? "/");
     router.refresh();
   }
 
@@ -280,7 +281,10 @@ function LoginPageInner() {
 
       <p className="mt-6 text-center text-sm text-foreground/60">
         Don&rsquo;t have an account?{" "}
-        <Link href="/register" className="font-medium text-foreground hover:underline">
+        <Link
+          href={next ? `/register?next=${encodeURIComponent(next)}` : "/register"}
+          className="font-medium text-foreground hover:underline"
+        >
           Sign up
         </Link>
       </p>

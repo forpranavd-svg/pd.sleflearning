@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterPageInner />
+    </Suspense>
+  );
+}
+
+function RegisterPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -26,6 +36,7 @@ export default function RegisterPage() {
           email: email || undefined,
           phone: phone || undefined,
           password: password || undefined,
+          next: next || undefined,
         }),
       });
       const data = await res.json();
@@ -35,6 +46,7 @@ export default function RegisterPage() {
         return;
       }
       const params = new URLSearchParams({ channel: data.channel, contact: data.contact });
+      if (next) params.set("next", next);
       router.push(`/login?${params.toString()}`);
     } catch {
       setError("Something went wrong. Try again.");
@@ -99,7 +111,10 @@ export default function RegisterPage() {
 
       <p className="mt-6 text-center text-sm text-foreground/60">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-foreground hover:underline">
+        <Link
+          href={next ? `/login?next=${encodeURIComponent(next)}` : "/login"}
+          className="font-medium text-foreground hover:underline"
+        >
           Log in
         </Link>
       </p>
