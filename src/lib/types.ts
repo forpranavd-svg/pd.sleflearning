@@ -13,6 +13,15 @@ export type Question = {
   noReviewNeeded: boolean;
   timesPracticed: number;
   lastPracticedAt: string | null;
+  ownerId?: string | null;
+  questionVisibility?: string;
+  answerVisibility?: string;
+  difficultyLevel?: string;
+  targetRoles?: string[];
+  chanceOfBeingAsked?: string;
+  source?: string;
+  /** Whether the current viewer has this question in their own list (#15). Undefined for signed-out viewers. */
+  inMyList?: boolean;
 };
 
 export type TopicsResponse = {
@@ -21,4 +30,5 @@ export type TopicsResponse = {
   levels: string[];
   infraVsDevValues: string[];
   scopes: string[];
+  roles: string[];
 };

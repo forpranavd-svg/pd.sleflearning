@@ -12,6 +12,7 @@ type Filters = {
   level: string;
   infraVsDev: string;
   scope: string;
+  role: string;
   reviewNeeded: string; // "", "true", "false"
   q: string;
 };
@@ -23,6 +24,7 @@ const emptyFilters: Filters = {
   level: "",
   infraVsDev: "",
   scope: "",
+  role: "",
   reviewNeeded: "",
   q: "",
 };
@@ -35,6 +37,7 @@ function buildQuery(filters: Filters, page: number) {
   if (filters.level) params.set("level", filters.level);
   if (filters.infraVsDev) params.set("infraVsDev", filters.infraVsDev);
   if (filters.scope) params.set("scope", filters.scope);
+  if (filters.role) params.set("role", filters.role);
   if (filters.reviewNeeded) params.set("reviewNeeded", filters.reviewNeeded);
   if (filters.q) params.set("q", filters.q);
   params.set("page", String(page));
@@ -54,11 +57,15 @@ export default function QuestionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
     fetch("/api/topics")
       .then((r) => r.json())
       .then(setTopicsData);
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => setLoggedIn(!!data.user));
   }, []);
 
   useEffect(() => {
@@ -109,6 +116,12 @@ export default function QuestionsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ noReviewNeeded: next }),
     });
+  }
+
+  async function toggleMyList(question: Question) {
+    const next = !question.inMyList;
+    setQuestions((qs) => qs.map((q) => (q.id === question.id ? { ...q, inMyList: next } : q)));
+    await fetch(`/api/questions/${question.id}/list`, { method: next ? "POST" : "DELETE" });
   }
 
   function startEdit(question: Question) {
@@ -236,6 +249,19 @@ export default function QuestionsPage() {
         </select>
 
         <select
+          value={filters.role}
+          onChange={(e) => updateFilter("role", e.target.value)}
+          className="rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm dark:border-white/15"
+        >
+          <option value="">All Roles</option>
+          {topicsData?.roles.map((v) => (
+            <option key={v} value={v}>
+              {v}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={filters.reviewNeeded}
           onChange={(e) => updateFilter("reviewNeeded", e.target.value)}
           className="rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm dark:border-white/15"
@@ -302,6 +328,24 @@ export default function QuestionsPage() {
                     >
                       Practice
                     </Link>
+                    {loggedIn === true && (
+                      <button
+                        onClick={() => toggleMyList(question)}
+                        className={`font-medium hover:underline ${
+                          question.inMyList ? "text-green-700 dark:text-green-400" : "text-foreground/60 hover:text-foreground"
+                        }`}
+                      >
+                        {question.inMyList ? "✓ In my list" : "Add to my list"}
+                      </button>
+                    )}
+                    {loggedIn === false && (
+                      <Link
+                        href="/login?next=/questions"
+                        className="font-medium text-foreground/60 hover:text-foreground hover:underline"
+                      >
+                        Log in to add to list
+                      </Link>
+                    )}
                   </div>
                   {isOpen && (
                     <div className="mt-3 text-sm text-foreground/70">

@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { randomQuote } from "@/lib/quotes";
+import { getCurrentUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
+export default async function Home() {
   const quote = randomQuote();
+
+  const user = await getCurrentUser();
+  const hasList = user ? (await prisma.userQuestion.count({ where: { userId: user.id } })) > 0 : false;
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-24 text-center">
@@ -32,6 +37,12 @@ export default function Home() {
           className="rounded-full border border-black/10 px-8 py-3 text-base font-medium transition-colors hover:bg-black/[.04] dark:border-white/15 dark:hover:bg-white/[.06]"
         >
           Browse Questions
+        </Link>
+        <Link
+          href="/build"
+          className="rounded-full border border-black/10 px-8 py-3 text-base font-medium transition-colors hover:bg-black/[.04] dark:border-white/15 dark:hover:bg-white/[.06]"
+        >
+          {hasList ? "Edit My Interview Kit" : "Build My Interview Kit"}
         </Link>
       </div>
     </div>

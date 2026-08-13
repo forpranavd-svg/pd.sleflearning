@@ -10,10 +10,46 @@ datasource db {
   provider = "postgresql"
 }
 
+// A registered user. Optional until #7/#8 (registration/login) ship — for now
+// this table exists so #6's multi-user schema can be added additively without
+// a second migration later; no code creates User rows yet.
+model User {
+  id             String   @id @default(cuid())
+  email          String?  @unique
+  phone          String?  @unique
+  name           String?
+  role           String? // "Developer" | "CTO" | "Architect" | "Scrum Master" | "My Role" | "Data Engineer" | "AI Engineer" | custom
+  passwordHash   String? // optional password fallback alongside passwordless login (#8)
+  sessionVersion Int      @default(0) // bumped on logout/password change to invalidate all existing session cookies
+  createdAt      DateTime @default(now())
+
+  ownedQuestions   Question[]        @relation("QuestionOwner")
+  listItems        UserQuestion[]
+  practiceAttempts PracticeAttempt[]
+  jobs             Job[]
+  loginTokens      LoginToken[]
+}
+
+// Single-use, expiring tokens for passwordless email login (#8). Only the
+// SHA-256 hash of the raw token is stored, so a DB read alone can't be used
+// to log in as someone else.
+model LoginToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 // A single interview-prep question, imported from the study spreadsheet
 // plus fields the app itself manages (review status, practice history).
 model Question {
-  id       String @id @default(cuid())
+  id String @id @default(cuid())
 
   // --- Imported from the spreadsheet ---
   topic                 String
@@ -27,19 +63,34 @@ model Question {
   answer                String? @db.Text
   sourceSheet           String // which spreadsheet tab this row came from
 
-  // --- App-managed state ---
-  noReviewNeeded   Boolean   @default(false) // user-set: exclude from practice rotation
-  timesPracticed   Int       @default(0)
-  lastPracticedAt  DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  // --- App-managed state (single-user era; superseded by UserQuestion once
+  // #7/#8 land and Browse/Practice cut over to per-user list state) ---
+  noReviewNeeded  Boolean   @default(false) // user-set: exclude from practice rotation
+  timesPracticed  Int       @default(0)
+  lastPracticedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // --- Multi-user ownership & metadata (#6) ---
+  ownerId            String? // null = system/seed question (today's ~1500 imported rows)
+  owner              User?                    @relation("QuestionOwner", fields: [ownerId], references: [id])
+  difficultyLevel    String                   @default("Medium") // Easy | Medium | Hard
+  targetRoles        String[]                 @default([]) // multi-select; "My Role" resolves to owner's own role
+  chanceOfBeingAsked String                   @default("Medium") // VeryHigh | High | Medium | Low | VeryLow
+  questionVisibility String                   @default("Public") // Public | Private
+  answerVisibility   String                   @default("Private") // Public | Private
+  source             String                   @default("seed") // seed | import | ai | manual
+  searchVector       Unsupported("tsvector")? // GIN-indexed via raw SQL; not yet populated or queried
 
   attempts PracticeAttempt[]
+  listedBy UserQuestion[]
 
   @@index([topic])
   @@index([subTopic])
   @@index([probabilityTier])
   @@index([noReviewNeeded])
+  @@index([ownerId])
+  @@index([questionVisibility])
 }
 
 // One recorded practice attempt: the user's typed answer plus AI feedback.
@@ -48,10 +99,57 @@ model PracticeAttempt {
   questionId String
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
+  // Nullable until #7/#8 ship; required for all attempts created after login exists.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
   userAnswer String  @db.Text
   aiFeedback String? @db.Text
 
   createdAt DateTime @default(now())
 
   @@index([questionId])
+  @@index([userId])
+}
+
+// Per-user membership + per-user practice state for a question in their list.
+// Will replace Question.noReviewNeeded/timesPracticed/lastPracticedAt for any
+// question that isn't exclusively owned+practiced by a single user, once
+// #7/#8 (accounts) ship and Browse/Practice cut over. Not read or written by
+// any route yet.
+model UserQuestion {
+  id                   String    @id @default(cuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId           String
+  question             Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  addedVia             String // "own" | "public" | "ai"
+  noReviewNeeded       Boolean   @default(false)
+  userAnswerConfidence Int       @default(0) // 0 NotRated .. 5 VeryHigh
+  timesPracticed       Int       @default(0)
+  lastPracticedAt      DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@unique([userId, questionId])
+}
+
+// Background processing for slow operations (bulk CSV import, AI batch
+// generation) so they run outside the request/response cycle. Simple
+// polling-based design (processed by a cron-triggered route), not a managed
+// queue, per current scale needs. Not created or processed by any route yet.
+model Job {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String // "csv_import" | "ai_question_generation"
+  status     String    @default("pending") // pending | running | done | failed
+  input      Json
+  result     Json?
+  error      String?
+  createdAt  DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
 }

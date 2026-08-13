@@ -16,9 +16,19 @@ function multiValue(searchParams: URLSearchParams, key: string): string[] | unde
  *   topic, subTopic, probabilityTier, level, infraVsDev, scope  - comma-separated, OR'd within a field
  *   reviewNeeded=true|false                                     - filters on noReviewNeeded
  *   q                                                            - free-text search over question/answer
+ *   role                                                         - matches questions targeting that role,
+ *                                                                  OR questions with no role set (applies to everyone)
+ *
+ * `viewerId` scopes results to Public questions plus the viewer's own
+ * Private ones — omit (or pass null) for an anonymous viewer, who only
+ * sees Public questions.
  */
-export function buildQuestionWhere(searchParams: URLSearchParams): Prisma.QuestionWhereInput {
+export function buildQuestionWhere(
+  searchParams: URLSearchParams,
+  viewerId?: string | null
+): Prisma.QuestionWhereInput {
   const where: Prisma.QuestionWhereInput = {};
+  const and: Prisma.QuestionWhereInput[] = [];
 
   const topic = multiValue(searchParams, "topic");
   if (topic) where.topic = { in: topic };
@@ -42,13 +52,40 @@ export function buildQuestionWhere(searchParams: URLSearchParams): Prisma.Questi
   if (reviewNeeded === "true") where.noReviewNeeded = false;
   if (reviewNeeded === "false") where.noReviewNeeded = true;
 
-  const q = searchParams.get("q")?.trim();
-  if (q) {
-    where.OR = [
-      { question: { contains: q, mode: "insensitive" } },
-      { answer: { contains: q, mode: "insensitive" } },
-    ];
+  const role = searchParams.get("role")?.trim();
+  if (role) {
+    and.push({ OR: [{ targetRoles: { isEmpty: true } }, { targetRoles: { has: role } }] });
   }
 
+  const q = searchParams.get("q")?.trim();
+  if (q) {
+    and.push({
+      OR: [
+        { question: { contains: q, mode: "insensitive" } },
+        { answer: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+
+  and.push(
+    viewerId ? { OR: [{ questionVisibility: "Public" }, { ownerId: viewerId }] } : { questionVisibility: "Public" }
+  );
+
+  if (and.length > 0) where.AND = and;
+
   return where;
+}
+
+/**
+ * Hides a question's answer text when its answerVisibility is Private and
+ * the viewer isn't the owner — the question itself can still be Public
+ * (and thus returned by buildQuestionWhere) while its answer stays private.
+ */
+export function redactPrivateAnswer<
+  T extends { answer: string | null; answerVisibility: string; ownerId: string | null },
+>(question: T, viewerId: string | null): T {
+  if (question.answerVisibility === "Private" && question.ownerId !== viewerId) {
+    return { ...question, answer: null };
+  }
+  return question;
 }
