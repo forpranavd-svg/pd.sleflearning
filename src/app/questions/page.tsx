@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Question, TopicsResponse } from "@/lib/types";
 import { Markdown } from "@/components/Markdown";
 
@@ -288,6 +289,20 @@ export default function QuestionsPage() {
                   >
                     {question.question}
                   </button>
+                  <div className="mt-1.5 flex items-center gap-3 text-xs">
+                    <button
+                      onClick={() => setExpanded((e) => ({ ...e, [question.id]: !isOpen }))}
+                      className="font-medium text-foreground/60 hover:text-foreground hover:underline"
+                    >
+                      {isOpen ? "Hide answer" : "View answer"}
+                    </button>
+                    <Link
+                      href={`/practice?questionId=${question.id}`}
+                      className="font-medium text-foreground/60 hover:text-foreground hover:underline"
+                    >
+                      Practice
+                    </Link>
+                  </div>
                   {isOpen && (
                     <div className="mt-3 text-sm text-foreground/70">
                       {editingId === question.id ? (

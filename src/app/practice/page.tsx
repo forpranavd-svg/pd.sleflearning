@@ -1,10 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Question, TopicsResponse } from "@/lib/types";
 import { Markdown } from "@/components/Markdown";
 
 export default function PracticePage() {
+  return (
+    <Suspense fallback={null}>
+      <PracticePageInner />
+    </Suspense>
+  );
+}
+
+function PracticePageInner() {
+  const searchParams = useSearchParams();
+  const questionId = searchParams.get("questionId");
   const [topicsData, setTopicsData] = useState<TopicsResponse | null>(null);
   const [topic, setTopic] = useState("");
   const [question, setQuestion] = useState<Question | null>(null);
@@ -33,10 +44,28 @@ export default function PracticePage() {
     setLoadingQuestion(false);
   }
 
+  async function fetchQuestionById(id: string) {
+    setLoadingQuestion(true);
+    setAnswer("");
+    setFeedback(null);
+    setError(null);
+    const res = await fetch(`/api/questions/${id}`);
+    const data = await res.json();
+    setQuestion(res.ok ? data.question : null);
+    setLoadingQuestion(false);
+  }
+
   useEffect(() => {
+    if (questionId) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount/param-change pattern
     fetchRandomQuestion(topic);
-  }, [topic]);
+  }, [topic, questionId]);
+
+  useEffect(() => {
+    if (!questionId) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard fetch-on-mount/param-change pattern
+    fetchQuestionById(questionId);
+  }, [questionId]);
 
   async function submitAnswer() {
     if (!question || !answer.trim()) return;
@@ -83,8 +112,9 @@ export default function PracticePage() {
         <p className="mt-10 text-sm text-foreground/50">Picking a question…</p>
       ) : !question ? (
         <p className="mt-10 text-sm text-foreground/50">
-          No questions available for this topic. Try another topic, or mark fewer questions as
-          &ldquo;no review needed&rdquo; on the Browse page.
+          {questionId
+            ? "That question couldn't be found."
+            : 'No questions available for this topic. Try another topic, or mark fewer questions as "no review needed" on the Browse page.'}
         </p>
       ) : (
         <div className="mt-8">
