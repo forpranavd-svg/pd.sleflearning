@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
     system:
       "You are an interview coach giving feedback on a spoken/written practice answer to a technical or behavioral interview question. " +
       "Be direct and specific. Point out what was strong, what was missing or incorrect, and how to tighten the answer. " +
-      "Keep the whole response under 200 words. Format as short paragraphs or a few bullet points, no headers.",
+      "Keep the whole response under 200 words. Format as short paragraphs or a few bullet points, no headers. " +
+      "Respond in Markdown (e.g. **bold**, bullet lists, ```mermaid fenced blocks for diagrams) since it is rendered as Markdown.",
     messages: [
       {
         role: "user",

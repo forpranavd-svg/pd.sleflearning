@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Question, TopicsResponse } from "@/lib/types";
+import { Markdown } from "@/components/Markdown";
 
 type Filters = {
   topic: string;
@@ -317,11 +318,11 @@ export default function QuestionsPage() {
                         </div>
                       ) : (
                         <>
-                          <div className="whitespace-pre-wrap">
-                            {question.answer ?? (
-                              <span className="italic text-foreground/40">No answer recorded yet.</span>
-                            )}
-                          </div>
+                          {question.answer ? (
+                            <Markdown>{question.answer}</Markdown>
+                          ) : (
+                            <span className="italic text-foreground/40">No answer recorded yet.</span>
+                          )}
                           <button
                             onClick={() => startEdit(question)}
                             className="mt-2 text-xs font-medium text-foreground/60 hover:text-foreground hover:underline"

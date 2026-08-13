@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Question, TopicsResponse } from "@/lib/types";
+import { Markdown } from "@/components/Markdown";
 
 export default function PracticePage() {
   const [topicsData, setTopicsData] = useState<TopicsResponse | null>(null);
@@ -131,7 +132,7 @@ export default function PracticePage() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground/50">
                 AI Feedback
               </p>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{feedback}</p>
+              <Markdown>{feedback}</Markdown>
               <button
                 onClick={() => fetchRandomQuestion(topic)}
                 className="mt-4 rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
