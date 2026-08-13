@@ -233,7 +233,8 @@ export function parseImportFile(buffer: ArrayBuffer, resolveMyRole: string | nul
       }
     }
 
-    const { roles: targetRoles, error: rolesError } = parseTargetRoles(fields.targetRoles ?? null);
+    // Column omitted/blank defaults to "My Role", per spec — not "applies to everyone".
+    const { roles: targetRoles, error: rolesError } = parseTargetRoles(fields.targetRoles ?? "My Role");
     if (rolesError) errors.push({ row: rowNumber, message: rolesError });
 
     const { value: userAnswerConfidence, error: confidenceError } = parseConfidence(
