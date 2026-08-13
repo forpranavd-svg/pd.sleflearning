@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Question, TopicsResponse } from "@/lib/types";
+import { Markdown } from "@/components/Markdown";
 
 type Filters = {
   topic: string;
@@ -49,6 +51,9 @@ export default function QuestionsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetch("/api/topics")
@@ -104,6 +109,34 @@ export default function QuestionsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ noReviewNeeded: next }),
     });
+  }
+
+  function startEdit(question: Question) {
+    setEditingId(question.id);
+    setDraft(question.answer ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft("");
+  }
+
+  async function saveAnswer(question: Question) {
+    setSaving(true);
+    const res = await fetch(`/api/questions/${question.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer: draft }),
+    });
+    if (res.ok) {
+      const { question: updated } = await res.json();
+      setQuestions((qs) =>
+        qs.map((q) => (q.id === question.id ? { ...q, answer: updated.answer } : q))
+      );
+      setEditingId(null);
+      setDraft("");
+    }
+    setSaving(false);
   }
 
   const hasActiveFilters = Object.values(filters).some(Boolean);
@@ -256,10 +289,62 @@ export default function QuestionsPage() {
                   >
                     {question.question}
                   </button>
+                  <div className="mt-1.5 flex items-center gap-3 text-xs">
+                    <button
+                      onClick={() => setExpanded((e) => ({ ...e, [question.id]: !isOpen }))}
+                      className="font-medium text-foreground/60 hover:text-foreground hover:underline"
+                    >
+                      {isOpen ? "Hide answer" : "View answer"}
+                    </button>
+                    <Link
+                      href={`/practice?questionId=${question.id}`}
+                      className="font-medium text-foreground/60 hover:text-foreground hover:underline"
+                    >
+                      Practice
+                    </Link>
+                  </div>
                   {isOpen && (
-                    <div className="mt-3 whitespace-pre-wrap text-sm text-foreground/70">
-                      {question.answer ?? (
-                        <span className="italic text-foreground/40">No answer recorded yet.</span>
+                    <div className="mt-3 text-sm text-foreground/70">
+                      {editingId === question.id ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            value={draft}
+                            onChange={(e) => setDraft(e.target.value)}
+                            rows={8}
+                            autoFocus
+                            className="w-full rounded-md border border-black/10 bg-transparent px-3 py-2 text-sm outline-none focus:border-black/30 dark:border-white/15 dark:focus:border-white/40"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => saveAnswer(question)}
+                              disabled={saving}
+                              className="rounded-md border border-black/10 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-black/[.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[.06]"
+                            >
+                              {saving ? "Saving…" : "Save"}
+                            </button>
+                            <button
+                              onClick={cancelEdit}
+                              disabled={saving}
+                              className="rounded-md border border-black/10 px-3 py-1.5 text-xs text-foreground/60 transition-colors hover:bg-black/[.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[.06]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {question.answer ? (
+                            <Markdown>{question.answer}</Markdown>
+                          ) : (
+                            <span className="italic text-foreground/40">No answer recorded yet.</span>
+                          )}
+                          <button
+                            onClick={() => startEdit(question)}
+                            className="mt-2 text-xs font-medium text-foreground/60 hover:text-foreground hover:underline"
+                          >
+                            Edit
+                          </button>
+                        </>
                       )}
                     </div>
                   )}
